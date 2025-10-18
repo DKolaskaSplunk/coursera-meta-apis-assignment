@@ -1,15 +1,18 @@
 from django.contrib.auth.models import User, Group
 from rest_framework import generics, status
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 
-from .models import MenuItem, Category
+from .models import MenuItem, Category, Cart, OrderItem, Order
 from .serializers import (
     MenuItemSerializer,
     CategorySerializer,
     UserIdSerializer,
     ReadOnlyUserIdSerializer,
+    CartSerializer,
+    OrderItemSerializer,
 )
-from .permissions import ManagerAllCustomerAndDeliveryCrewReadOnly, ManagerOnly
+from .permissions import ManagerAllCustomerAndDeliveryCrewReadOnly, ManagerOnly, OrderListPermission
 
 
 class CategoryList(generics.ListCreateAPIView):
@@ -81,3 +84,33 @@ class DeliveryCrewList(GroupMemberList):
 
 class RemoveDeliveryCrew(RemoveGroupMember):
     group_name = "Delivery Crew"
+
+
+class CartListCreateDelete(generics.ListCreateAPIView, generics.DestroyAPIView):
+    serializer_class = CartSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Cart.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def get_object(self):
+        return self.get_queryset()[0]
+
+
+class OrderList(generics.ListCreateAPIView):
+    serializer_class = OrderItemSerializer
+    permission_classes = [OrderListPermission]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.groups.filter(name="Manager").exists():
+            return OrderItem.objects.all()
+        elif user.groups.filter(name="Delivery Crew").exists():
+            return OrderItem.objects.filter(order__delivery_crew=user)
+        return OrderItem.objects.filter(order__user=user)
+
+    def post(self, request, *args, **kwargs):
+        order = Order(request.user, delivery_crew=None, )
