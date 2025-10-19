@@ -1,4 +1,7 @@
+import datetime
+
 from django.contrib.auth.models import User, Group
+from django.db import transaction
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -12,7 +15,11 @@ from .serializers import (
     CartSerializer,
     OrderItemSerializer,
 )
-from .permissions import ManagerAllCustomerAndDeliveryCrewReadOnly, ManagerOnly, OrderListPermission
+from .permissions import (
+    ManagerAllCustomerAndDeliveryCrewReadOnly,
+    ManagerOnly,
+    OrderListPermission,
+)
 
 
 class CategoryList(generics.ListCreateAPIView):
@@ -112,5 +119,22 @@ class OrderList(generics.ListCreateAPIView):
             return OrderItem.objects.filter(order__delivery_crew=user)
         return OrderItem.objects.filter(order__user=user)
 
+    @transaction.atomic
     def post(self, request, *args, **kwargs):
-        order = Order(request.user, delivery_crew=None, )
+        cart = Cart.objects.filter(user=request.user)[0]
+        order = Order(
+            request.user,
+            delivery_crew=None,
+            status=0,
+            total=cart.quantity * cart.menuitem.price,
+            date=datetime.datetime.now(),
+        )
+        order_item = OrderItem(
+            order=order, menuitem=cart.menuitem, quantity=cart.quantity
+        )
+
+        cart.delete()
+        order.save()
+        order_item.save()
+
+        return Response(status=status.HTTP_201_CREATED)

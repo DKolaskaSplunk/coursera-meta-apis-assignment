@@ -39,5 +39,5 @@ class OrderListPermission(permissions.BasePermission):
 
         if request.method == "POST" and not is_customer(request.user):
             return False
-        
+
         return True

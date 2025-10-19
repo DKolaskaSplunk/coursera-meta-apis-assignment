@@ -4,18 +4,17 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('LittleLemonAPI', '0002_remove_cart_price_remove_cart_unit_price'),
+        ("LittleLemonAPI", "0002_remove_cart_price_remove_cart_unit_price"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='orderitem',
-            name='price',
+            model_name="orderitem",
+            name="price",
         ),
         migrations.RemoveField(
-            model_name='orderitem',
-            name='unit_price',
+            model_name="orderitem",
+            name="unit_price",
         ),
     ]
