@@ -5,7 +5,7 @@ from django.test import TestCase
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from .models import Category, MenuItem
+from .models import Cart, Category, MenuItem
 
 # ---------------------------------------------------------------------------- #
 #               User registration and token generation endpoints               #
@@ -241,11 +241,11 @@ class UserGroupManagementTestCase(TestCase):
 
     def test_endpoint_accessible_only_to_manager(self):
         params = (
-            (self.client.get, "/api/groups/manager/users"),
-            (self.client.post, "/api/groups/manager/users", {"id": 2}),
+            (self.client.get, "/api/groups/manager/users/"),
+            (self.client.post, "/api/groups/manager/users/", {"id": 2}),
             (self.client.delete, "/api/groups/manager/users/2"),
-            (self.client.get, "/api/groups/delivery-crew/users"),
-            (self.client.post, "/api/groups/delivery-crew/users", {"id": 2}),
+            (self.client.get, "/api/groups/delivery-crew/users/"),
+            (self.client.post, "/api/groups/delivery-crew/users/", {"id": 2}),
             (self.client.delete, "/api/groups/delivery-crew/users/2"),
         )
 
@@ -263,7 +263,7 @@ class UserGroupManagementTestCase(TestCase):
         self.user.groups.add(manager_group)
 
         # when
-        response = self.client.get("/api/groups/manager/users")
+        response = self.client.get("/api/groups/manager/users/")
 
         # then
         self.assertEqual(response.status_code, 200)
@@ -281,7 +281,7 @@ class UserGroupManagementTestCase(TestCase):
         new_user.groups.add(manager_group)
 
         # when
-        response = self.client.post("/api/groups/manager/users", {"id": new_user.id})
+        response = self.client.post("/api/groups/manager/users/", {"id": new_user.id})
 
         # then
         self.assertEqual(response.status_code, 201)
@@ -308,7 +308,7 @@ class UserGroupManagementTestCase(TestCase):
         self.user.groups.add(delivery_crew_group)
 
         # when
-        response = self.client.get("/api/groups/delivery-crew/users")
+        response = self.client.get("/api/groups/delivery-crew/users/")
 
         # then
         self.assertEqual(response.status_code, 200)
@@ -329,7 +329,7 @@ class UserGroupManagementTestCase(TestCase):
 
         # when
         response = self.client.post(
-            "/api/groups/delivery-crew/users", {"id": new_user.id}
+            "/api/groups/delivery-crew/users/", {"id": new_user.id}
         )
 
         # then
@@ -350,3 +350,89 @@ class UserGroupManagementTestCase(TestCase):
         # then
         self.assertEqual(response.status_code, 200)
         self.assertNotIn(self.user, delivery_crew_group.user_set.all())
+
+
+# ---------------------------------------------------------------------------- #
+#                           Cart management endpoints                          #
+# ---------------------------------------------------------------------------- #
+
+
+class CartManagementTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="test_user", email="test_user@example.com", password="Password123!"
+        )
+        self.token = Token.objects.create(user=self.user)
+        self.token.save()
+        self.client.credentials(HTTP_AUTHORIZATION="Token {}".format(self.token))
+
+    def test_get_empty_cart(self):
+        # when
+        response = self.client.get("/api/cart/menu-items/")
+
+        # then
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 0)
+
+    def test_get_cart_with_items(self):
+        # given
+        main_course_category = Category.objects.create(
+            slug="main-course", title="Main Course"
+        )
+        menu_item1 = MenuItem.objects.create(
+            title="Pasta",
+            price=12.99,
+            featured=False,
+            category=main_course_category,
+        )
+        Cart.objects.create(user=self.user, menuitem=menu_item1, quantity=2)
+
+        # when
+        response = self.client.get("/api/cart/menu-items/")
+
+        # then
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+
+    def test_add_item_to_cart(self):
+        # given
+        main_course_category = Category.objects.create(
+            slug="main-course", title="Main Course"
+        )
+        menu_item1 = MenuItem.objects.create(
+            title="Pasta",
+            price=12.99,
+            featured=False,
+            category=main_course_category,
+        )
+
+        # when
+        response = self.client.post(
+            "/api/cart/menu-items/",
+            {"menuitem_id": menu_item1.id, "quantity": 3},
+            content_type="application/json",
+        )
+
+        # then
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["quantity"], 3)
+
+    def test_remove_item_from_cart(self):
+        # given
+        main_course_category = Category.objects.create(
+            slug="main-course", title="Main Course"
+        )
+        menu_item1 = MenuItem.objects.create(
+            title="Pasta",
+            price=12.99,
+            featured=False,
+            category=main_course_category,
+        )
+        Cart.objects.create(user=self.user, menuitem=menu_item1, quantity=2)
+
+        # when
+        response = self.client.delete("/api/cart/menu-items/")
+
+        # then
+        self.assertEqual(response.status_code, 204)
