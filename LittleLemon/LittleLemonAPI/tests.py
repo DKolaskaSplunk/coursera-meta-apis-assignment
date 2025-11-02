@@ -1,3 +1,5 @@
+from functools import partial
+
 from django.contrib.auth.models import Group, User
 from django.test import TestCase
 from rest_framework.authtoken.models import Token
@@ -220,3 +222,131 @@ class MenuItemsTestCase(TestCase):
 
         # then
         self.assertEqual(response.status_code, 204)
+
+
+# ---------------------------------------------------------------------------- #
+#                        User group management endpoints                       #
+# ---------------------------------------------------------------------------- #
+
+
+class UserGroupManagementTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="test_user", email="test_user@example.com", password="Password123!"
+        )
+        self.token = Token.objects.create(user=self.user)
+        self.token.save()
+        self.client.credentials(HTTP_AUTHORIZATION="Token {}".format(self.token))
+
+    def test_endpoint_accessible_only_to_manager(self):
+        params = (
+            (self.client.get, "/api/groups/manager/users"),
+            (self.client.post, "/api/groups/manager/users", {"id": 2}),
+            (self.client.delete, "/api/groups/manager/users/2"),
+            (self.client.get, "/api/groups/delivery-crew/users"),
+            (self.client.post, "/api/groups/delivery-crew/users", {"id": 2}),
+            (self.client.delete, "/api/groups/delivery-crew/users/2"),
+        )
+
+        for api_client_func, *args in params:
+            with self.subTest(api_client_call=args):
+                # when
+                response = partial(api_client_func, *args)()
+
+                # then
+                self.assertEqual(response.status_code, 403)
+
+    def test_get_managers(self):
+        # given
+        manager_group = Group.objects.create(name="Manager")
+        self.user.groups.add(manager_group)
+
+        # when
+        response = self.client.get("/api/groups/manager/users")
+
+        # then
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["id"], self.user.id)
+
+    def test_add_manager(self):
+        # given
+        manager_group = Group.objects.create(name="Manager")
+        self.user.groups.add(manager_group)
+
+        new_user = User.objects.create_user(
+            username="new_user", email="new_user@example.com", password="Password123!"
+        )
+        new_user.groups.add(manager_group)
+
+        # when
+        response = self.client.post("/api/groups/manager/users", {"id": new_user.id})
+
+        # then
+        self.assertEqual(response.status_code, 201)
+        self.assertIn(new_user, manager_group.user_set.all())
+
+    def test_remove_manager(self):
+        # given
+        manager_group = Group.objects.create(name="Manager")
+        self.user.groups.add(manager_group)
+
+        # when
+        response = self.client.delete(f"/api/groups/manager/users/{self.user.id}")
+
+        # then
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(self.user, manager_group.user_set.all())
+
+    def test_get_delivery_crew(self):
+        # given
+        manager_group = Group.objects.create(name="Manager")
+        self.user.groups.add(manager_group)
+
+        delivery_crew_group = Group.objects.create(name="Delivery Crew")
+        self.user.groups.add(delivery_crew_group)
+
+        # when
+        response = self.client.get("/api/groups/delivery-crew/users")
+
+        # then
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["id"], self.user.id)
+
+    def test_add_delivery_crew(self):
+        # given
+        manager_group = Group.objects.create(name="Manager")
+        self.user.groups.add(manager_group)
+
+        delivery_crew_group = Group.objects.create(name="Delivery Crew")
+
+        new_user = User.objects.create_user(
+            username="new_user", email="new_user@example.com", password="Password123!"
+        )
+        new_user.groups.add(delivery_crew_group)
+
+        # when
+        response = self.client.post(
+            "/api/groups/delivery-crew/users", {"id": new_user.id}
+        )
+
+        # then
+        self.assertEqual(response.status_code, 201)
+        self.assertIn(new_user, delivery_crew_group.user_set.all())
+
+    def test_remove_delivery_crew(self):
+        # given
+        manager_group = Group.objects.create(name="Manager")
+        self.user.groups.add(manager_group)
+
+        delivery_crew_group = Group.objects.create(name="Delivery Crew")
+        self.user.groups.add(delivery_crew_group)
+
+        # when
+        response = self.client.delete(f"/api/groups/delivery-crew/users/{self.user.id}")
+
+        # then
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(self.user, delivery_crew_group.user_set.all())
