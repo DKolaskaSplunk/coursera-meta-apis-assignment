@@ -5,7 +5,7 @@ from django.test import TestCase
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from .models import Cart, Category, MenuItem
+from .models import Cart, Category, MenuItem, Order, OrderItem
 
 # ---------------------------------------------------------------------------- #
 #               User registration and token generation endpoints               #
@@ -436,3 +436,156 @@ class CartManagementTestCase(TestCase):
 
         # then
         self.assertEqual(response.status_code, 204)
+
+
+# ---------------------------------------------------------------------------- #
+#                          Order management endpoints                          #
+# ---------------------------------------------------------------------------- #
+
+
+class OrderManagementTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="test_user", email="test_user@example.com", password="Password123!"
+        )
+        self.token = Token.objects.create(user=self.user)
+        self.token.save()
+        self.client.credentials(HTTP_AUTHORIZATION="Token {}".format(self.token))
+
+    def test_get_orders_when_customer(self):
+        # given
+        customer = User.objects.create_user(
+            username="customer_user",
+            email="customer_user@example.com",
+            password="Password123!",
+        )
+
+        order = Order.objects.create(user=self.user, total=29.99, date="2024-01-01")
+        order2 = Order.objects.create(user=customer, total=15.99, date="2024-01-02")
+        main_course_category = Category.objects.create(
+            slug="main-course", title="Main Course"
+        )
+        menu_item1 = MenuItem.objects.create(
+            title="Pasta",
+            price=12.99,
+            featured=False,
+            category=main_course_category,
+        )
+        OrderItem.objects.create(order=order, menuitem=menu_item1, quantity=2)
+        OrderItem.objects.create(order=order2, menuitem=menu_item1, quantity=1)
+
+        # when
+        response = self.client.get("/api/orders/")
+
+        # then
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(
+            response.data[0]["order"]["user"]["username"], self.user.username
+        )
+
+    def test_get_orders_when_manager(self):
+        # given
+        customer = User.objects.create_user(
+            username="customer_user",
+            email="customer_user@example.com",
+            password="Password123!",
+        )
+        manager_group = Group.objects.create(name="Manager")
+        self.user.groups.add(manager_group)
+
+        order = Order.objects.create(user=self.user, total=29.99, date="2024-01-01")
+        order2 = Order.objects.create(user=customer, total=15.99, date="2024-01-02")
+        main_course_category = Category.objects.create(
+            slug="main-course", title="Main Course"
+        )
+        menu_item1 = MenuItem.objects.create(
+            title="Pasta",
+            price=12.99,
+            featured=False,
+            category=main_course_category,
+        )
+        OrderItem.objects.create(order=order, menuitem=menu_item1, quantity=2)
+        OrderItem.objects.create(order=order2, menuitem=menu_item1, quantity=1)
+
+        # when
+        response = self.client.get("/api/orders/")
+
+        # then
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(
+            response.data[0]["order"]["user"]["username"], self.user.username
+        )
+        self.assertEqual(
+            response.data[1]["order"]["user"]["username"], customer.username
+        )
+
+    def test_get_orders_when_delivery_crew(self):
+        # given
+        delivery_person = User.objects.create_user(
+            username="delivery_user",
+            email="delivery_user@example.com",
+            password="Password123!",
+        )
+        delivery_crew_group = Group.objects.create(name="Delivery Crew")
+        delivery_person.groups.add(delivery_crew_group)
+
+        order = Order.objects.create(
+            user=self.user,
+            total=29.99,
+            date="2024-01-01",
+            delivery_crew=delivery_person,
+        )
+        order2 = Order.objects.create(user=self.user, total=15.99, date="2024-01-02")
+        main_course_category = Category.objects.create(
+            slug="main-course", title="Main Course"
+        )
+        menu_item1 = MenuItem.objects.create(
+            title="Pasta",
+            price=12.99,
+            featured=False,
+            category=main_course_category,
+        )
+        OrderItem.objects.create(order=order, menuitem=menu_item1, quantity=2)
+        OrderItem.objects.create(order=order2, menuitem=menu_item1, quantity=1)
+
+        # when
+        self.client.credentials(
+            HTTP_AUTHORIZATION="Token {}".format(
+                Token.objects.create(user=delivery_person)
+            )
+        )
+        response = self.client.get("/api/orders/")
+
+        # then
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(
+            response.data[0]["order"]["user"]["username"], self.user.username
+        )
+        self.assertEqual(response.data[0]["order"]["delivery_crew"], delivery_person.id)
+
+    def test_create_order(self):
+        # given
+        main_course_category = Category.objects.create(
+            slug="main-course", title="Main Course"
+        )
+        menu_item1 = MenuItem.objects.create(
+            title="Pasta",
+            price=12.99,
+            featured=False,
+            category=main_course_category,
+        )
+        Cart.objects.create(user=self.user, menuitem=menu_item1, quantity=2)
+
+        # when
+        response = self.client.post(
+            "/api/orders/",
+            {},
+            content_type="application/json",
+        )
+
+        # then
+        self.assertEqual(response.status_code, 201)

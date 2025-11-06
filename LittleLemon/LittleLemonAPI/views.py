@@ -123,7 +123,7 @@ class OrderList(generics.ListCreateAPIView):
     def post(self, request, *args, **kwargs):
         cart = Cart.objects.filter(user=request.user)[0]
         order = Order(
-            request.user,
+            user=request.user,
             delivery_crew=None,
             status=0,
             total=cart.quantity * cart.menuitem.price,
