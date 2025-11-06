@@ -16,7 +16,7 @@ from .serializers import (
     CartSerializer,
     CategorySerializer,
     MenuItemSerializer,
-    OrderItemSerializer,
+    OrderSerializer,
     ReadOnlyUserIdSerializer,
     UserIdSerializer,
 )
@@ -108,16 +108,16 @@ class CartListCreateDelete(generics.ListCreateAPIView, generics.DestroyAPIView):
 
 
 class OrderList(generics.ListCreateAPIView):
-    serializer_class = OrderItemSerializer
+    serializer_class = OrderSerializer
     permission_classes = [OrderListPermission]
 
     def get_queryset(self):
         user = self.request.user
         if user.groups.filter(name="Manager").exists():
-            return OrderItem.objects.all()
+            return Order.objects.all()
         elif user.groups.filter(name="Delivery Crew").exists():
-            return OrderItem.objects.filter(order__delivery_crew=user)
-        return OrderItem.objects.filter(order__user=user)
+            return Order.objects.filter(delivery_crew=user)
+        return Order.objects.filter(user=user)
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):

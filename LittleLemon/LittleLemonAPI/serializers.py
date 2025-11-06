@@ -56,14 +56,18 @@ class CartSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     user = UserIdSerializer(read_only=True)
+    items = serializers.SerializerMethodField("get_items")
+
+    def get_items(self, obj):
+        order_items = OrderItem.objects.filter(order=obj)
+        return OrderItemSerializer(order_items, many=True).data
 
     class Meta:
         model = Order
-        fields = ["id", "user", "delivery_crew", "status", "total", "date"]
+        fields = ["id", "user", "delivery_crew", "status", "total", "date", "items"]
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
-    order = OrderSerializer()
     unit_price = serializers.SerializerMethodField("get_unit_price")
     price = serializers.SerializerMethodField("get_price")
 
@@ -75,10 +79,9 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrderItem
-        fields = ["id", "order", "menuitem", "quantity", "unit_price", "price"]
+        fields = ["id", "menuitem", "quantity", "unit_price", "price"]
         read_only_fields = [
             "id",
-            "order",
             "menuitem",
             "quantity",
             "unit_price",

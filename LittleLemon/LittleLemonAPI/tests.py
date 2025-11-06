@@ -481,9 +481,7 @@ class OrderManagementTestCase(TestCase):
         # then
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
-        self.assertEqual(
-            response.data[0]["order"]["user"]["username"], self.user.username
-        )
+        self.assertEqual(response.data[0]["user"]["username"], self.user.username)
 
     def test_get_orders_when_manager(self):
         # given
@@ -515,12 +513,8 @@ class OrderManagementTestCase(TestCase):
         # then
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 2)
-        self.assertEqual(
-            response.data[0]["order"]["user"]["username"], self.user.username
-        )
-        self.assertEqual(
-            response.data[1]["order"]["user"]["username"], customer.username
-        )
+        self.assertEqual(response.data[0]["user"]["username"], self.user.username)
+        self.assertEqual(response.data[1]["user"]["username"], customer.username)
 
     def test_get_orders_when_delivery_crew(self):
         # given
@@ -562,10 +556,8 @@ class OrderManagementTestCase(TestCase):
         # then
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
-        self.assertEqual(
-            response.data[0]["order"]["user"]["username"], self.user.username
-        )
-        self.assertEqual(response.data[0]["order"]["delivery_crew"], delivery_person.id)
+        self.assertEqual(response.data[0]["user"]["username"], self.user.username)
+        self.assertEqual(response.data[0]["delivery_crew"], delivery_person.id)
 
     def test_create_order(self):
         # given
