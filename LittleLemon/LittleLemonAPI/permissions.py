@@ -1,6 +1,6 @@
 from rest_framework import permissions
 
-from .helpers import is_customer
+from .helpers import is_customer, is_manager
 
 
 class ManagerAllCustomerAndDeliveryCrewReadOnly(permissions.BasePermission):
@@ -31,13 +31,30 @@ class ManagerOnly(permissions.BasePermission):
 
 class OrderListPermission(permissions.BasePermission):
     def has_permission(self, request, view):
-        return request.user.is_authenticated
+        if not request.user.is_authenticated:
+            return False
 
-    def has_object_permission(self, request, view, obj):
         if request.user.is_superuser:
             return True
 
         if request.method == "POST" and not is_customer(request.user):
+            return False
+
+        return True
+
+
+class OrderDetailPermission(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+
+        if request.user.is_superuser:
+            return True
+
+        if request.method == "DELETE" and not is_manager(request.user):
+            return False
+
+        if request.method == "PUT" and not is_customer(request.user):
             return False
 
         return True

@@ -11,15 +11,19 @@ from .permissions import (
     ManagerAllCustomerAndDeliveryCrewReadOnly,
     ManagerOnly,
     OrderListPermission,
+    OrderDetailPermission,
 )
 from .serializers import (
     CartSerializer,
     CategorySerializer,
     MenuItemSerializer,
     OrderSerializer,
+    OrderSerializerForDeliveryCrew,
+    OrderSerializerForManager,
     ReadOnlyUserIdSerializer,
     UserIdSerializer,
 )
+from .helpers import is_manager, is_delivery_crew
 
 
 class CategoryList(generics.ListCreateAPIView):
@@ -138,3 +142,16 @@ class OrderList(generics.ListCreateAPIView):
         order_item.save()
 
         return Response(status=status.HTTP_201_CREATED)
+
+
+class OrderDetail(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Order.objects.all()
+    permission_classes = [OrderDetailPermission]
+
+    def get_serializer_class(self):
+        user = self.request.user
+        if is_manager(user):
+            return OrderSerializerForManager
+        elif is_delivery_crew(user):
+            return OrderSerializerForDeliveryCrew
+        return OrderSerializer

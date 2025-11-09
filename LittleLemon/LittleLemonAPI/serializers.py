@@ -67,6 +67,16 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = ["id", "user", "delivery_crew", "status", "total", "date", "items"]
 
 
+class OrderSerializerForManager(OrderSerializer):
+    class Meta(OrderSerializer.Meta):
+        read_only_fields = ["id", "user", "total", "date", "items"]
+
+
+class OrderSerializerForDeliveryCrew(OrderSerializer):
+    class Meta(OrderSerializer.Meta):
+        read_only_fields = ["id", "user", "delivery_crew", "total", "date", "items"]
+
+
 class OrderItemSerializer(serializers.ModelSerializer):
     unit_price = serializers.SerializerMethodField("get_unit_price")
     price = serializers.SerializerMethodField("get_price")

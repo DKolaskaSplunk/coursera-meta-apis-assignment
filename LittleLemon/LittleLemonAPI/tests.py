@@ -581,3 +581,144 @@ class OrderManagementTestCase(TestCase):
 
         # then
         self.assertEqual(response.status_code, 201)
+
+    def test_create_order_when_not_customer_forbidden(self):
+        for group_name in ["Manager", "Delivery Crew"]:
+            with self.subTest(group=group_name):
+                # given
+                group = Group.objects.create(name=group_name)
+                self.user.groups.add(group)
+
+                main_course_category = Category.objects.create(
+                    slug="main-course", title="Main Course"
+                )
+                menu_item1 = MenuItem.objects.create(
+                    title="Pasta",
+                    price=12.99,
+                    featured=False,
+                    category=main_course_category,
+                )
+                Cart.objects.create(user=self.user, menuitem=menu_item1, quantity=2)
+
+                # when
+                response = self.client.post(
+                    "/api/orders/",
+                    {},
+                    content_type="application/json",
+                )
+
+                # then
+                self.assertEqual(response.status_code, 403)
+
+    def test_update_order_when_customer(self):
+        # given
+        order = Order.objects.create(user=self.user, total=29.99, date="2024-01-01")
+
+        # when
+        response = self.client.patch(
+            f"/api/orders/{order.id}",
+            {"total": 19.99},
+            content_type="application/json",
+        )
+
+        # then
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total"], "19.99")
+
+    def test_update_order_when_manager_or_delivery_crew_tries_to_update_read_only_field_then_no_change(
+        self,
+    ):
+        for group_name in ["Manager", "Delivery Crew"]:
+            with self.subTest(group=group_name):
+                # given
+                group = Group.objects.create(name=group_name)
+                self.user.groups.add(group)
+                order = Order.objects.create(
+                    user=self.user, total=29.99, date="2024-01-01"
+                )
+
+                # when
+                response = self.client.patch(
+                    f"/api/orders/{order.id}",
+                    {"total": 19.99},  # Try to update read-only field
+                    content_type="application/json",
+                )
+
+                # then
+                # NOTE: DRF serializer doesn't raise an error when we try to update read-only fields
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data["total"], "29.99")
+
+    def test_update_order_status_when_manager_or_delivery_crew(self):
+        for group_name in ["Manager", "Delivery Crew"]:
+            with self.subTest(group=group_name):
+                # given
+                group = Group.objects.create(name=group_name)
+                self.user.groups.add(group)
+                order = Order.objects.create(
+                    user=self.user, total=29.99, date="2024-01-01"
+                )
+
+                # when
+                response = self.client.patch(
+                    f"/api/orders/{order.id}",
+                    {"status": 1},
+                    content_type="application/json",
+                )
+
+                # then
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data["status"], 1)
+
+    def test_update_order_delivery_crew_when_manager(self):
+        # given
+        manager_group = Group.objects.create(name="Manager")
+        self.user.groups.add(manager_group)
+        delivery_person = User.objects.create_user(
+            username="delivery_user",
+            email="delivery_user@example.com",
+            password="Password123!",
+        )
+        delivery_crew_group = Group.objects.create(name="Delivery Crew")
+        delivery_person.groups.add(delivery_crew_group)
+        order = Order.objects.create(user=self.user, total=29.99, date="2024-01-01")
+
+        # when
+        response = self.client.patch(
+            f"/api/orders/{order.id}",
+            {"delivery_crew": delivery_person.id},
+            content_type="application/json",
+        )
+
+        # then
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["delivery_crew"], delivery_person.id)
+
+    def test_delete_order_when_manager(self):
+        # given
+        manager_group = Group.objects.create(name="Manager")
+        self.user.groups.add(manager_group)
+        order = Order.objects.create(user=self.user, total=29.99, date="2024-01-01")
+
+        # when
+        response = self.client.delete(f"/api/orders/{order.id}")
+
+        # then
+        self.assertEqual(response.status_code, 204)
+
+    def test_delete_order_when_not_manager_forbidden(self):
+        for group_name in ["Customer", "Delivery Crew"]:
+            with self.subTest(group=group_name):
+                # given
+                if group_name != "Customer":
+                    group = Group.objects.create(name=group_name)
+                    self.user.groups.add(group)
+                order = Order.objects.create(
+                    user=self.user, total=29.99, date="2024-01-01"
+                )
+
+                # when
+                response = self.client.delete(f"/api/orders/{order.id}")
+
+                # then
+                self.assertEqual(response.status_code, 403)
