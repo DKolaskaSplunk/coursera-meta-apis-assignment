@@ -42,6 +42,9 @@ class MenuItemList(generics.ListCreateAPIView):
     queryset = MenuItem.objects.all()
     serializer_class = MenuItemSerializer
     permission_classes = [ManagerAllCustomerAndDeliveryCrewReadOnly]
+    filterset_fields = ["featured", "category"]
+    search_fields = ["title"]
+    ordering_fields = ["price"]
 
 
 class MenuItemDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -114,6 +117,8 @@ class CartListCreateDelete(generics.ListCreateAPIView, generics.DestroyAPIView):
 class OrderList(generics.ListCreateAPIView):
     serializer_class = OrderSerializer
     permission_classes = [OrderListPermission]
+    filterset_fields = ["user", "delivery_crew", "status", "date"]
+    ordering_fields = ["date", "total"]
 
     def get_queryset(self):
         user = self.request.user
