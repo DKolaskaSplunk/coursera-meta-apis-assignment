@@ -136,4 +136,5 @@ REST_FRAMEWORK = {
         "rest_framework.filters.OrderingFilter",
         "rest_framework.filters.SearchFilter",
     ],
+    "DEFAULT_PAGINATION_CLASS": "LittleLemon.pagination.LittleLemonPagination",
 }

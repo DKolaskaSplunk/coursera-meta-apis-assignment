@@ -15,3 +15,10 @@ makemigrations:
 
 migrate:
 	cd LittleLemon && python manage.py migrate
+
+fmt:
+	ruff format .
+	ruff check --select I --fix .
+
+lint:
+	ruff check --fix .
